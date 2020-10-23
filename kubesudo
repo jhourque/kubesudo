@@ -28,6 +28,8 @@ fi
 TMPKUBE=$(mktemp)
 
 kubectl config view --flatten --minify > $TMPKUBE
+CONTEXT=$(kubectl config current-context)
+CLUSTER=$(kubectl config view --context current-context -o jsonpath='{.contexts[?(@.name=="'$CONTEXT'")].context.cluster}')
 
 export KUBECONFIG=$TMPKUBE
 
@@ -35,10 +37,12 @@ SECRET=$(kubectl -n $NAMESPACE get sa $SA -o go-template='{{range .secrets}}{{pr
 TOKEN=$(kubectl -n $NAMESPACE get secret ${SECRET} -o go-template='{{.data.token}}')
 
 kubectl config set-credentials kubesudo:$NAMESPACE:$SA \
-    --token=`echo ${TOKEN} | base64 -D` > /dev/null
+    --token=`echo ${TOKEN} | base64 -d` > /dev/null
 
-kubectl config set-context $(kubectl config current-context) --user=kubesudo:$NAMESPACE:$SA > /dev/null
+kubectl config set-context kubesudo --user=kubesudo:$NAMESPACE:$SA --cluster=$CLUSTER > /dev/null
+kubectl config use-context kubesudo
 
 kubectl --kubeconfig=$TMPKUBE $@
 
+#echo export KUBECONFIG=$TMPKUBE
 rm $TMPKUBE
